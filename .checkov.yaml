@@ -1,0 +1,9 @@
+directory:
+  - .
+framework:
+  - terraform
+compact: true
+quiet: true
+# Suppress individual checks here with a reason, e.g.:
+# skip-check:
+#   - CKV_XXX_1  # why it doesn't apply to local kind clusters
