@@ -3,8 +3,11 @@ include "root" {
 }
 
 terraform {
-  source = "../../modules//argocd"
+  source = "../../../modules//argocd"
 }
+
+# The single Argo CD install. It lives on the management cluster and registers
+# every environment's workload cluster.
 
 # Mocks let validate/plan run before the clusters exist.
 locals {
@@ -18,14 +21,16 @@ locals {
 }
 
 dependency "mgmt" {
-  config_path                             = "../clusters/argocd"
+  config_path                             = "../cluster"
   mock_outputs                            = local.mock_cluster
   mock_outputs_allowed_terraform_commands = ["validate", "plan", "init"]
 }
 
-dependency "apps" {
-  config_path                             = "../clusters/apps"
-  mock_outputs                            = local.mock_cluster
+# One dependency per environment's workload cluster. Mock names must be
+# unique, since they become workload_clusters keys during plan.
+dependency "dev_apps" {
+  config_path                             = "../../dev/apps"
+  mock_outputs                            = merge(local.mock_cluster, { name = "dev-apps" })
   mock_outputs_allowed_terraform_commands = ["validate", "plan", "init"]
 }
 
@@ -37,12 +42,12 @@ inputs = {
     cluster_ca_certificate = dependency.mgmt.outputs.cluster_ca_certificate
   }
 
-  # Add a dependency block and an entry here for each workload cluster.
+  # Add a dependency block and an entry here for each environment.
   workload_clusters = {
-    (dependency.apps.outputs.name) = {
-      client_certificate     = dependency.apps.outputs.client_certificate
-      client_key             = dependency.apps.outputs.client_key
-      cluster_ca_certificate = dependency.apps.outputs.cluster_ca_certificate
+    (dependency.dev_apps.outputs.name) = {
+      client_certificate     = dependency.dev_apps.outputs.client_certificate
+      client_key             = dependency.dev_apps.outputs.client_key
+      cluster_ca_certificate = dependency.dev_apps.outputs.cluster_ca_certificate
     }
   }
 }

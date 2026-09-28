@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-Terraform modules orchestrated by Terragrunt that run two local kind clusters:
-`argocd` (Argo CD management cluster) and `apps` (workload cluster managed by
-Argo CD).
+Terraform modules orchestrated by Terragrunt that run local kind clusters: one
+shared `argocd` management cluster, plus one workload cluster per environment
+(`<env>-apps`, currently only `dev`) managed by that single Argo CD.
 
 ## Layout
 
@@ -15,11 +15,16 @@ Argo CD).
   secret per entry in `workload_clusters`, and a data source for the initial
   admin password. `helm`/`kubernetes` providers are configured from
   `var.management`.
-- `live/clusters/<name>/terragrunt.hcl`: one unit per cluster. The directory
-  and `name` input become the kind cluster name.
-- `live/argocd/terragrunt.hcl`: `dependency` blocks on the cluster units (with
-  `mock_outputs` for validate/plan) feed `management` and `workload_clusters`.
-  A new workload cluster needs a unit plus a dependency and map entry here.
+- `live/mgmt/`: not an environment; there is only ever one. `cluster/` is the
+  `argocd` kind cluster, `argocd/` is the Argo CD install. `argocd/` has a
+  `dependency` block per env workload cluster (with `mock_outputs` for
+  validate/plan; mock names must be unique) feeding `management` and
+  `workload_clusters`.
+- `live/<env>/env.hcl`: per-env locals (`env`, `apps_workers`), read by that
+  env's units via `read_terragrunt_config`. `live/<env>/apps/` builds
+  `<env>-apps` (env-prefixed: kind names are unique per Docker host).
+- A new env needs a copy of `live/dev` plus a dependency and map entry in
+  `live/mgmt/argocd`. Remove an env from there before destroying it.
 
 ## Conventions and gotchas
 
@@ -36,7 +41,7 @@ Argo CD).
   `https://<name>-control-plane:6443`, not the host-mapped endpoint. The TLS
   data is PEM from the cluster unit outputs, base64-encoded for the secret.
 - `workload_clusters` must not be marked sensitive: its keys drive `for_each`.
-- Clusters exist before the `argocd` unit plans, so `kubernetes_manifest` is
+- Clusters exist before the `mgmt/argocd` unit plans, so `kubernetes_manifest` is
   usable there, but mocked plans (`run --all plan` on a fresh setup) can't
   reach a real API. Prefer typed resources like `kubernetes_secret_v1` or Helm.
 - Kubeconfigs are written to `~/.kube/config.d/kind-<name>.yaml`.
@@ -51,7 +56,7 @@ terragrunt hcl fmt
 cd live && terragrunt run --all validate
 cd live && terragrunt run --all apply
 cd live && terragrunt run --all destroy
-cd live/argocd && terragrunt output -raw admin_password
+cd live/mgmt/argocd && terragrunt output -raw admin_password
 checkov --config-file .checkov.yaml   # same scan CI runs (modules/)
 ```
 
