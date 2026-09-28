@@ -1,17 +1,12 @@
 locals {
-  clusters = {
-    argocd = { workers = var.argocd_workers }
-    apps   = { workers = var.apps_workers }
-  }
+  kubeconfig_path = coalesce(var.kubeconfig_path, pathexpand("~/.kube/config.d/kind-${var.name}.yaml"))
 }
 
 resource "kind_cluster" "this" {
-  for_each = local.clusters
-
-  name            = each.key
+  name            = var.name
   node_image      = var.node_image
   wait_for_ready  = true
-  kubeconfig_path = pathexpand("~/.kube/kind-${each.key}.yaml")
+  kubeconfig_path = local.kubeconfig_path
 
   kind_config {
     kind        = "Cluster"
@@ -22,7 +17,7 @@ resource "kind_cluster" "this" {
     }
 
     dynamic "node" {
-      for_each = range(each.value.workers)
+      for_each = range(var.workers)
       content {
         role = "worker"
       }
