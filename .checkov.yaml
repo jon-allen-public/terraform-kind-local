@@ -1,7 +1,9 @@
 directory:
-  - .
+  - modules
 framework:
   - terraform
+skip-path:
+  - .terragrunt-cache
 compact: true
 quiet: true
 # Suppress individual checks here with a reason, e.g.:

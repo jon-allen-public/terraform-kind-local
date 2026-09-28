@@ -3,3 +3,6 @@
 *.tfstate.*
 crash.log
 *.tfvars
+.terraform.lock.hcl
+.terragrunt-cache/
+.state/
